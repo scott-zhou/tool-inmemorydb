@@ -1,4 +1,5 @@
-tool-inmemorydb
-===============
+# Inmenory Database and Table
 
-Inmemory DB, which can share data between processor.
+Can share memory between processors. The shared data can be raw data or tables.
+
+Created by [Scott Zhou](http://www.scottzhou.me)
