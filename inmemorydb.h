@@ -23,8 +23,8 @@ private:
     int semID;
     int shmID;
 public:
-        CInmemoryDB(){pShmData = NULL;semID = -1;shmID = -1;};
-        ~CInmemoryDB(){
+    CInmemoryDB() { pShmData = NULL;semID = -1;shmID = -1; };
+    ~CInmemoryDB(){
         if (pShmData != NULL) {
             shmdt((char *)pShmData);
             pShmData = NULL;
@@ -40,9 +40,7 @@ public:
     int unLock(int tableid);
     int releaseInmemDB(void);
     int isExist(void);
-    int getShmId(){
-        return    shmID;
-    };
+    inline int getShmId() { return shmID; };
 private:
     int releaseShm();
     int releaseSem();
