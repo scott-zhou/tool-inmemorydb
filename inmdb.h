@@ -1,5 +1,5 @@
 /**
-  * inmemorydb.h IPC management
+  * inmdb.h IPC management
  **/
 
 #ifndef __INMEMORYDB_H__
@@ -23,7 +23,7 @@ private:
     int semID;
     int shmID;
 public:
-    CInmemoryDB() { pShmData = NULL;semID = -1;shmID = -1; };
+    CInmemoryDB() : pShmData(NULL), semID(-1), shmID(-1){};
     ~CInmemoryDB(){
         if (pShmData != NULL) {
             shmdt((char *)pShmData);
@@ -41,10 +41,9 @@ public:
     int releaseInmemDB(void);
     int isExist(void);
     inline int getShmId() { return shmID; };
+    int detatchShm(void);
 private:
     int releaseShm();
     int releaseSem();
-public:
-    int detatchShm(void);
 };
 #endif
