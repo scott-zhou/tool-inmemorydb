@@ -11,7 +11,12 @@
 #ifndef __INMDB_LOG_H__
 #define __INMDB_LOG_H__
 
-#define inmdb_Log(format)     printf("%s:%d:%s "format"\n",__FILE__,__LINE__,__FUNCTION__)
-#define inmdb_log(format,...) printf("%s:%d:%s "format"\n",__FILE__,__LINE__,__FUNCTION__,__VA_ARGS__)
+#define	LOGDEBUG	5
+#define LOGWARN		4
+#define LOGMAJOR	3
+#define LOGMINOR	2
+#define LOGCRITICAL	1
+
+#define inmdb_log(level, format,...) printf("%s:%d:%s LEVEL %d: "format"\n",__FILE__,__LINE__,__FUNCTION__,level,__VA_ARGS__)
 
 #endif
