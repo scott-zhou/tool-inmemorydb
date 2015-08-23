@@ -2,8 +2,8 @@
   * inmdb.h IPC management
  **/
 
-#ifndef __INMEMORYDB_H__
-#define __INMEMORYDB_H__
+#ifndef LIB_INMEMORYDB_H_
+#define LIB_INMEMORYDB_H_
 
 #include <stdlib.h>
 #include <string.h>
@@ -14,22 +14,17 @@
 #include <sys/sem.h>
 #include <errno.h>
 
-#define MAXNUMOFTABLE    100
-#define MAXNUMOFSEMS    256
 class CInmemoryDB{
 private:
+    static const int kMaxNumOfTable = 100;
+    static const int kMaxNumOfSems  = 256;
     //datamember
     void *pShmData;
     int semID;
     int shmID;
 public:
-    CInmemoryDB() : pShmData(NULL), semID(-1), shmID(-1){};
-    ~CInmemoryDB(){
-        if (pShmData != NULL) {
-            shmdt((char *)pShmData);
-            pShmData = NULL;
-        }
-    };
+    CInmemoryDB();
+    ~CInmemoryDB();
     int create(const char *ipcPathName,int ipcid,int shmSize,int semNum, int operatorFlag = 0600);
     int connect(const char *ipcPathName,int ipcid,int accessFlag = 0);
     int createTable(int tableid,int tableSize);
@@ -46,4 +41,4 @@ private:
     int releaseShm();
     int releaseSem();
 };
-#endif
+#endif  //LIB_INMEMORYDB_H_

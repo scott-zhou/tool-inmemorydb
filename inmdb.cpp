@@ -4,6 +4,21 @@
 #include <unistd.h>
 #include <time.h>
 
+CInmemoryDB::CInmemoryDB() :
+        pShmData(NULL),
+        semID(-1),
+        shmID(-1)
+{
+}
+
+CInmemoryDB::~CInmemoryDB()
+{
+    if (pShmData != NULL) {
+        shmdt((char *)pShmData);
+        pShmData = NULL;
+    }
+}
+
 /**********************************************
  Title:create:ipc create
  parameter:
@@ -14,7 +29,6 @@
 
  Error Number:
  *********************************************/
-
 int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int semNum, int operatorFlag)
 {
     //ipcid is limited between 1 and 255,and ipcPathName is not empty;
@@ -28,7 +42,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     }
 
     //shmSize and semNum ard limited
-    if(shmSize <= 0 || semNum < 1 || semNum > MAXNUMOFSEMS){
+    if(shmSize <= 0 || semNum < 1 || semNum > kMaxNumOfSems){
         inmdb_log(LOGDEBUG,"shmSize(%d)or semNum(%d) error < 1.",shmSize,semNum);
         return 0;
     }
@@ -62,7 +76,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     union semum {
         int val;
         struct semid_ds *buf;
-        ushort array[MAXNUMOFSEMS+1];
+        ushort array[kMaxNumOfSems+1];
     }arg;
 
     memset(&arg,0,sizeof(arg));
@@ -85,13 +99,13 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     }
 
     memset(pShmData, 0, shmSize);
-    for(int offsetindex = 0; offsetindex < MAXNUMOFTABLE; offsetindex++){
+    for(int offsetindex = 0; offsetindex < kMaxNumOfTable; offsetindex++){
         int flag = -1;
         memcpy((void *)((int)pShmData + 4*offsetindex),&flag,4);
     }
 
-    memcpy((void *)((int)pShmData + 4*MAXNUMOFTABLE),&shmSize,4);
-    memcpy((void *)((int)pShmData + MAXNUMOFTABLE*4 + 4),&semNum,4);
+    memcpy((void *)((int)pShmData + 4*kMaxNumOfTable),&shmSize,4);
+    memcpy((void *)((int)pShmData + kMaxNumOfTable*4 + 4),&semNum,4);
 
 
     shmdt(pShmData);
@@ -107,7 +121,6 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
          1 Success
  Error Number:
  *********************************************/
-
 int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
 {
     if(ipcid < 1 || ipcid > 255){
@@ -163,10 +176,9 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
 
  Error Number:
  *********************************************/
- 
 int CInmemoryDB::createTable(int tableid,int tableSize)
 {
-    if(tableid < 0 || tableid > MAXNUMOFTABLE - 1 || tableSize <= 0){
+    if(tableid < 0 || tableid > kMaxNumOfTable - 1 || tableSize <= 0){
         inmdb_log(LOGDEBUG,"tableid(%d) or tableSize(%d) invalid", tableid, tableSize);
         return 0;
     }
@@ -178,7 +190,7 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
     }
 
     if(tableid == 0){
-        tableoffset[0] = MAXNUMOFTABLE*4 + 8;
+        tableoffset[0] = kMaxNumOfTable*4 + 8;
     }
     else if(tableoffset[tableid - 1] < 0){
         return 0;
@@ -193,7 +205,7 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
         inmdb_log(LOGDEBUG,"table offset(%d) beyond the db size.", offset);
         return 0;
     }
-    if(tableid < MAXNUMOFTABLE - 1){
+    if(tableid < kMaxNumOfTable - 1){
         tableoffset[tableid+1] = -1 * offset;
     }
     return 1;
@@ -206,7 +218,6 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
  Returns: NULL:error
  Error Number:
  *********************************************/
-
 void * CInmemoryDB::getTablePData(int tableid)
 {
     int *tableoffset = (int *)pShmData;
@@ -223,10 +234,9 @@ void * CInmemoryDB::getTablePData(int tableid)
  Returns:
  Error Number:
  *********************************************/
-
 int CInmemoryDB::getDBSize(void)
 {
-    int *dbsize =(int *)((int) pShmData + 4*MAXNUMOFTABLE);
+    int *dbsize =(int *)((int) pShmData + 4*kMaxNumOfTable);
     return *dbsize;
 }
 
@@ -239,7 +249,7 @@ int CInmemoryDB::getDBSize(void)
  *********************************************/
 int CInmemoryDB::getTableSize(int tableid)
 {
-    if(tableid < 0||tableid >MAXNUMOFTABLE ){
+    if(tableid < 0||tableid >kMaxNumOfTable ){
         inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
         return 0;
     }
@@ -256,7 +266,7 @@ int CInmemoryDB::getTableSize(int tableid)
  *********************************************/
  int CInmemoryDB::lock(int tableid)
 {
-    if(tableid < 0||tableid >MAXNUMOFTABLE ){
+    if(tableid < 0||tableid >kMaxNumOfTable ){
         inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
         return 0;
     }
@@ -311,8 +321,7 @@ int CInmemoryDB::unLock(int tableid)
  parameter:
  Returns:0 error 1success
  Error Number:
- *********************************************/
- 
+ *********************************************/ 
 int CInmemoryDB::releaseInmemDB(void)
 {
     detatchShm();

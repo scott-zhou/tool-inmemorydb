@@ -8,15 +8,17 @@
   * https://github.com/scott-zhou/tool-log
   */
 
-#ifndef __INMDB_LOG_H__
-#define __INMDB_LOG_H__
+#ifndef LIB_INMEMORYDB_LOG_H_
+#define LIB_INMEMORYDB_LOG_H_
 
-#define	LOGDEBUG	5
-#define LOGWARN		4
-#define LOGMAJOR	3
-#define LOGMINOR	2
-#define LOGCRITICAL	1
+enum InmdbLogLevel {
+    LOGCRITICAL = 1,
+    LOGMINOR    = 2,
+    LOGMAJOR    = 3,
+    LOGWARN     = 4,
+    LOGDEBUG    = 5
+};
 
 #define inmdb_log(level, format,...) printf("%s:%d:%s LEVEL %d: "format"\n",__FILE__,__LINE__,__FUNCTION__,level,__VA_ARGS__)
 
-#endif
+#endif  //LIB_INMEMORYDB_LOG_H_
