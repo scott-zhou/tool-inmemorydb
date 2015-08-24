@@ -1,5 +1,6 @@
 /libs
 /bin
+/testbin
 inmemorydb.config
 inmemorydb.creator
 inmemorydb.creator.user

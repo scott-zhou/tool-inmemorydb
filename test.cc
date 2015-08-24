@@ -25,7 +25,7 @@ int main(int argc,char *argv[])
 
     TABLEINDEX tmp;
     TABLEINDEX tableIndex;
-    int shmSize = 200*1024*1024;
+    int shmSize = 150*100*1000;
     int semNum = 10;
     int createflag;
     int ipcid = atoi(argv[1]);
@@ -45,6 +45,7 @@ int main(int argc,char *argv[])
         return 1;
     }
     printf("connect success.\n");
+
     /*
        int tableid = 0;
        int tableSize = 1*1024*1024;
@@ -58,8 +59,9 @@ int main(int argc,char *argv[])
        printf("createTable myInmemDB.getTableSize(tableid = %d) %d.\n",tableid,myInmemDB.getTableSize(tableid));
      */
     //createflag = gw.create(&myInmemDB,0,100001,1,3);
-    createflag = gw.create(&myInmemDB,0,1000 *1000,0,0);
-    printf("dbsize %d tablesize %d.\n", shmSize/(1024*1024),gw.countTableSize(100000 *10,0,0)/(1024*1024));
+    printf("Count table size for 100 000 records: %d.\n", gw.countTableSize(100000,0,0));
+    createflag = gw.create(&myInmemDB,0,100 *1000,0,0);
+    printf("dbsize %d tablesize %d.\n", shmSize/(100*1000),gw.countTableSize(100000,0,0)/(100*1000));
     if(createflag == 0){
         printf("gw create error.\n");
         return 0;
