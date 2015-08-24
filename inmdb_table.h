@@ -1735,7 +1735,7 @@ bool CInmemoryTable<T>::sortdelete(int keyid,int dataIndex)
 Title:insert
 parameter:
 Description:
-Returns: 0 error;1 success
+Returns: index in table.
 Error Number:
 *********************************************/
 template <class T>
