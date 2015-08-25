@@ -4,7 +4,8 @@ all:inmdb.o \
 	test_create_db \
 	test_destroy_db \
 	test_create_table \
-	test_insert_record
+	test_insert_record \
+	test_traversal
 
 inmdb.o:inmdb.cc
 	g++ -Wall -c -O2 inmdb.cc  
@@ -28,3 +29,6 @@ test_create_table:test_create_table.cc inmdb.cc
 test_insert_record:test_insert_record.cc inmdb.cc
 	g++ -Wall test_insert_record.cc -g  -o insert_record libs/inmdb.o
 	mv insert_record testbin/.
+test_traversal:test_traversal.cc inmdb.cc
+	g++ -Wall test_traversal.cc -g  -o traversal libs/inmdb.o
+	mv traversal testbin/.

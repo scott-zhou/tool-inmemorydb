@@ -13,7 +13,7 @@ typedef struct gateway{
 
 #define IPC_PATH   "/tmp/inmdb_test_ipc"
 #define IPC_ID     160
-#define SHM_SIZE   17*1000*1000
+#define SHM_SIZE   20*1000*1000
 #define RECORD_NUM 100*1000
 #define SEM_NUM    10
 

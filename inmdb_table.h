@@ -6,7 +6,7 @@
 #define LIB_INMDB_TABLE_H__
 
 #include <time.h>
-
+#include <assert.h>
 #include "inmdb.h"
 #include "inmdb_table_index.h"
 #include "inmdb_const_values.h"
@@ -79,7 +79,8 @@ class CInmemoryTable{
         int clear(void);
         void addLookUpKey(int keyid,int field1offset,int field1Length, int field2offset,int field2Length,SEARCHMETHOD sm,KEYMETHOD km, const char *keyFormat="");
         int ASSERTTABLEINDEX(int tableindex);    //not thread-safe
-        TABLEINDEX search(T& tempdata,int keyid = 0); TABLEINDEX searchNext(T& tempdata,int keyid, TABLEINDEX tableindex);
+        TABLEINDEX search(T& tempdata,int keyid = 0);
+        TABLEINDEX searchNext(T& tempdata,int keyid, TABLEINDEX tableindex);
         TABLEINDEX searchPrefix(void *key,int keyid = 0);
         TABLEINDEX searchPrefixNext(void *key,int keyid, TABLEINDEX tableindex);
         //TABLEINDEX insert(T& tempdata);
@@ -238,7 +239,12 @@ Error Number:
 
 
 template <class T>
-int CInmemoryTable<T>::create(CInmemoryDB *pInmemoryDB, int id,int tablecapacity ,int numofhashkey,int numofsortkey)
+int CInmemoryTable<T>::create(
+        CInmemoryDB *pInmemoryDB,
+        int id,
+        int tablecapacity,
+        int numofhashkey,
+        int numofsortkey)
 {
     //tablesize is the totalsize(bytes) of the table
     //createflag is for returnvalue from  pInmemoryDB->createTable(),0 error,1 success,2 exist
@@ -271,6 +277,7 @@ int CInmemoryTable<T>::create(CInmemoryDB *pInmemoryDB, int id,int tablecapacity
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::create getTablePData tableid(%d).\n",id);
         return 0;
     }
+    // Memory struct is: TABLEDESCRIPTOR, keys, previous link table, next link table, data
 
     tableID = id;
     pInmemDB = pInmemoryDB;
@@ -447,6 +454,13 @@ void CInmemoryTable<T>::addLookUpKey(int keyid,int field1offset,int field1Length
     if(pTable == NULL){
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::addLookUpKey gpTable == NULL.\n",0);
         return;
+    }
+    assert(keyid>=0);
+    if(sm == HASHSEARCH) {
+        assert(keyid < pTableDescriptor->numOfHashKey);
+    }
+    else if(sm == SORTSEARCH) {
+        assert(keyid < pTableDescriptor->numOfSortKey);
     }
 
     pKey = (TABLEKEY*)((int)pTable + sizeof(TABLEDESCRIPTOR));

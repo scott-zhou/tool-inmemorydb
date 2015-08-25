@@ -17,7 +17,7 @@ int main(int argc,char *argv[])
     printf("DB size %dMB, table size %dMB.\n",
            SHM_SIZE/(1000*1000),
            gw.countTableSize(RECORD_NUM,0,0)/(1000*1000));
-    int createflag = gw.create(&myInmemDB,0,RECORD_NUM,0,0);
+    int createflag = gw.create(&myInmemDB,0,RECORD_NUM,2,2);
     if(createflag == 0){
         printf("GW table create error.\n");
         return 1;
@@ -32,6 +32,7 @@ int main(int argc,char *argv[])
         printf("GW connect error.\n");
         return 1;
     }
+    gw.addLookUpKey(0,OFFSET(GATEWAY,tt1),64,-1,-1,HASHSEARCH,STRKEYFROMONLYSTR, "%s");
     printf("GW table create and connect success.\n");
     return 0;
 }
