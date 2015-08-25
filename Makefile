@@ -7,7 +7,7 @@ all:inmdb.o \
 	test_insert_record
 
 inmdb.o:inmdb.cc
-	g++ -Wall -c -O2 -Wall inmdb.cc  
+	g++ -Wall -c -O2 inmdb.cc  
 	mv inmdb.o libs/.
 
 test:test.cc inmdb.cc

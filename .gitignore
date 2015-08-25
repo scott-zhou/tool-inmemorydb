@@ -6,6 +6,7 @@ inmemorydb.creator
 inmemorydb.creator.user
 inmemorydb.files
 inmemorydb.includes
+*~
             
 # Compiled Object files
 *.slo
