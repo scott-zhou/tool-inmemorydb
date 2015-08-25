@@ -91,7 +91,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
 
     pShmData = shmat(shmID,NULL,0);
 
-    if((long)pShmData == -1){
+    if((int)pShmData == -1){
         inmdb_log(LOGDEBUG,"shmat error: %d.", errno);
         releaseShm();
         releaseSem();
@@ -101,11 +101,11 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     memset(pShmData, 0, shmSize);
     for(int offsetindex = 0; offsetindex < kMaxNumOfTable; offsetindex++){
         int flag = -1;
-        memcpy((void *)((long)pShmData + 4*offsetindex),&flag,4);
+        memcpy((void *)((int)pShmData + 4*offsetindex),&flag,4);
     }
 
-    memcpy((void *)((long)pShmData + 4*kMaxNumOfTable),&shmSize,4);
-    memcpy((void *)((long)pShmData + kMaxNumOfTable*4 + 4),&semNum,4);
+    memcpy((void *)((int)pShmData + 4*kMaxNumOfTable),&shmSize,4);
+    memcpy((void *)((int)pShmData + kMaxNumOfTable*4 + 4),&semNum,4);
 
 
     shmdt(pShmData);
@@ -155,7 +155,7 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
     }
     pShmData = shmat(shmID,NULL,0);
 
-    if((long)pShmData == -1){
+    if((int)pShmData == -1){
         inmdb_log(LOGDEBUG,"shmat error: %d, ipcPathName=%s ipcid=%d shmID = %d",
                   errno, ipcPathName, ipcid, shmID);
         semID = -1;
@@ -224,7 +224,7 @@ void * CInmemoryDB::getTablePData(int tableid)
     if((int)tableoffset[tableid] == -1){
         return (void *) NULL;
     }
-    return (void *)((long)pShmData + tableoffset[tableid]);
+    return (void *)((int)pShmData + tableoffset[tableid]);
 }
 
 /**********************************************
@@ -236,7 +236,7 @@ void * CInmemoryDB::getTablePData(int tableid)
  *********************************************/
 int CInmemoryDB::getDBSize(void)
 {
-    int *dbsize =(int *)((long) pShmData + 4*kMaxNumOfTable);
+    int *dbsize =(int *)((int) pShmData + 4*kMaxNumOfTable);
     return *dbsize;
 }
 
