@@ -287,11 +287,11 @@ int CInmemoryTable<T>::create(CInmemoryDB *pInmemoryDB, int id,int tablecapacity
     memcpy(pTable,&TDescriptor,sizeof(TABLEDESCRIPTOR));
 
     //initial the pKey[keyid].loadCount = 0;
-    pKey = (TABLEKEY*)((int)pTable + sizeof(TABLEDESCRIPTOR));
+    pKey = (TABLEKEY*)((long)pTable + sizeof(TABLEDESCRIPTOR));
     //initiate the datapre/datanext/timestamp
     //dataPre = (int*)((int)pTable + sizeof(TABLEDESCRIPTOR) + (numofhashkey + numofsortkey) * sizeof(TABLEKEY) + numofhashkey * ((tablecapacity + 2) + getHashPrimeNumber((tablecapacity + 2))) * sizeof(int) + numofsortkey * (tablecapacity + 2) * sizeof(int));
-    dataPre = (int*)((int)pTable + sizeof(TABLEDESCRIPTOR) + (numofhashkey + numofsortkey) * sizeof(TABLEKEY) + numofhashkey * (2*getHashPrimeNumber((tablecapacity + 2))) * sizeof(int) + numofsortkey * (tablecapacity + 2) * sizeof(int));
-    dataNext = (int *)((int)dataPre + (tablecapacity + 2) * sizeof(int));
+    dataPre = (int*)((long)pTable + sizeof(TABLEDESCRIPTOR) + (numofhashkey + numofsortkey) * sizeof(TABLEKEY) + numofhashkey * (2*getHashPrimeNumber((tablecapacity + 2))) * sizeof(int) + numofsortkey * (tablecapacity + 2) * sizeof(int));
+    dataNext = (int *)((long)dataPre + (tablecapacity + 2) * sizeof(int));
     timeStamp = (time_t *)((int)dataNext + sizeof(int) * (tablecapacity + 2));
     dataNext[USEDHEAD] = USEDHEAD;
     dataPre[USEDHEAD] = USEDHEAD;

@@ -10,7 +10,7 @@
 #define MAXFIELDSTRING    128 // max lenth fo the field as key in the struct
 
 //define for canculate the field offset from beginning of the struct and the filed length.
-#define OFFSET(s, m) (int)&(((s*)NULL)->m)
+#define OFFSET(s, m) (long)&(((s*)NULL)->m)
 #define SIZEOF(s, m) sizeof(((s*)NULL)->m)
 
 //head of the datalist
