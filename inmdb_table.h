@@ -447,12 +447,12 @@ template <class T>
 void CInmemoryTable<T>::addLookUpKey(int keyid,int field1offset,int field1Length, int field2offset,int field2Length,SEARCHMETHOD sm,KEYMETHOD km, const char *keyFormat){
     void *pTable = NULL;
     if(tableID < 0){
-        inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::addLookUpKey tableID < 0.\n",0);
+        inmdb_log(LOGCRITICAL, "tableID(%d) < 0.\n", tableID);
         return;
     }
     pTable = pInmemDB->getTablePData(tableID);
     if(pTable == NULL){
-        inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::addLookUpKey gpTable == NULL.\n",0);
+        inmdb_log(LOGCRITICAL, "pTable(%p) is NULL.\n", pTable);
         return;
     }
     assert(keyid>=0);
@@ -463,7 +463,7 @@ void CInmemoryTable<T>::addLookUpKey(int keyid,int field1offset,int field1Length
         assert(keyid < pTableDescriptor->numOfSortKey);
     }
 
-    pKey = (TABLEKEY*)((int)pTable + sizeof(TABLEDESCRIPTOR));
+    pKey = (TABLEKEY*)((intptr_t)pTable + sizeof(TABLEDESCRIPTOR));
 
     pKey[keyid].searchMethod = sm;
     pKey[keyid].keyMethod = km;
