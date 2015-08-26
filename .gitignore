@@ -1,11 +1,11 @@
 /libs
 /bin
 /testbin
-inmemorydb.config
-inmemorydb.creator
-inmemorydb.creator.user
-inmemorydb.files
-inmemorydb.includes
+inm*.config
+inm*.creator
+inm*.creator.user
+inm*.files
+inm*.includes
 *~
             
 # Compiled Object files

@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include <assert.h>
 
 CInmemoryDB::CInmemoryDB() :
         pShmData(NULL),
@@ -91,7 +92,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
 
     pShmData = shmat(shmID,NULL,0);
 
-    if((int)pShmData == -1){
+    if((intptr_t)pShmData == -1){
         inmdb_log(LOGDEBUG,"shmat error: %d.", errno);
         releaseShm();
         releaseSem();
@@ -100,14 +101,17 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
 
     memset(pShmData, 0, shmSize);
     for(int offsetindex = 0; offsetindex < kMaxNumOfTable; offsetindex++){
+        // Default tableoffset value is -1, means not assigned
         int flag = -1;
-        memcpy((void *)((int)pShmData + 4*offsetindex),&flag,4);
+        memcpy((void *)((intptr_t)pShmData + sizeof(int)*offsetindex),
+               &flag,
+               sizeof(int));
     }
 
-    memcpy((void *)((int)pShmData + 4*kMaxNumOfTable),&shmSize,4);
-    memcpy((void *)((int)pShmData + kMaxNumOfTable*4 + 4),&semNum,4);
+    memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable),&shmSize,sizeof(int));
+    memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable + sizeof(int)),&semNum,sizeof(int));
 
-
+    //detach, a connect must be called obviously for use shared memory.
     shmdt(pShmData);
     pShmData = NULL;
     return 1;
@@ -155,7 +159,7 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
     }
     pShmData = shmat(shmID,NULL,0);
 
-    if((int)pShmData == -1){
+    if((intptr_t)pShmData == -1){
         inmdb_log(LOGDEBUG,"shmat error: %d, ipcPathName=%s ipcid=%d shmID = %d",
                   errno, ipcPathName, ipcid, shmID);
         semID = -1;
@@ -178,10 +182,9 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
  *********************************************/
 int CInmemoryDB::createTable(int tableid,int tableSize)
 {
-    if(tableid < 0 || tableid > kMaxNumOfTable - 1 || tableSize <= 0){
-        inmdb_log(LOGDEBUG,"tableid(%d) or tableSize(%d) invalid", tableid, tableSize);
-        return 0;
-    }
+    assert(tableid >= 0);
+    assert(tableid < kMaxNumOfTable);
+    assert(tableSize > 0);
 
     int offset;
     int *tableoffset = (int*)pShmData;
@@ -189,10 +192,15 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
         return 2;
     }
 
+    // memory struct: table offset table, shmSize, semNum, tables
+    int tableOffsetStart = kMaxNumOfTable*sizeof(int) + 2*sizeof(int);
+
     if(tableid == 0){
-        tableoffset[0] = kMaxNumOfTable*4 + 8;
+        tableoffset[0] = tableOffsetStart;
     }
     else if(tableoffset[tableid - 1] < 0){
+        // tableid must be used sequentially in create
+        // From 0 to kMaxNumOfTable-1, could not jump.
         return 0;
     }
     else{
@@ -200,8 +208,9 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
     }
 
     //set next table offset
-    offset = (int)tableoffset[tableid] + tableSize;
+    offset = tableoffset[tableid] + tableSize;
     if(offset > getDBSize()){
+        // TODO: Should do clean up here, or return earlier before set offset value.
         inmdb_log(LOGDEBUG,"table offset(%d) beyond the db size.", offset);
         return 0;
     }
@@ -221,10 +230,10 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
 void * CInmemoryDB::getTablePData(int tableid)
 {
     int *tableoffset = (int *)pShmData;
-    if((int)tableoffset[tableid] == -1){
+    if(tableoffset[tableid] < 0){
         return (void *) NULL;
     }
-    return (void *)((int)pShmData + tableoffset[tableid]);
+    return (void *)((intptr_t)pShmData + tableoffset[tableid]);
 }
 
 /**********************************************
@@ -236,7 +245,7 @@ void * CInmemoryDB::getTablePData(int tableid)
  *********************************************/
 int CInmemoryDB::getDBSize(void)
 {
-    int *dbsize =(int *)((int) pShmData + 4*kMaxNumOfTable);
+    int *dbsize =(int *)((intptr_t) pShmData + sizeof(int)*kMaxNumOfTable);
     return *dbsize;
 }
 
@@ -254,6 +263,7 @@ int CInmemoryDB::getTableSize(int tableid)
         return 0;
     }
     int *tableoffset = (int *)pShmData;
+    // TODO: Should check if it is a valid(created) tableid
     return (tableoffset[tableid + 1] - tableoffset[tableid])/(1024*1024);
 }
 
