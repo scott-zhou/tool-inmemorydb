@@ -31,6 +31,7 @@ int main(int argc,char *argv[])
         TABLEINDEX index = gw.insert(r);
         if(!gw.ASSERTTABLEINDEX(index)){
             printf("gw insert error i(%d).\n",i);
+            break;
         }
         else{
             printf("gw insert success, index %d\n", int(index));

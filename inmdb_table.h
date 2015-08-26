@@ -88,10 +88,10 @@ class CInmemoryTable{
         int deletex(int tableindex);
         int getTableUseRate();
         int GetTableLoadCount();
-        //TABLEINDEX  traversalPre(TABLEINDEX tableindex);
+        int begin();
+        int traversalNext(int tableindex);
+        int end();
         int  traversalPre(int tableindex);
-        //TABLEINDEX  traversalNext(TABLEINDEX tableindex);
-        int  traversalNext(int tableindex);
         int updateData(int offset,int dataLenth,int tableindex,const void *pNewData);
         const T* operator()(int index);    //not thread-safe
         time_t getTimeStamp(int index){return timeStamp[index];};
@@ -210,7 +210,7 @@ int CInmemoryTable<T>::printSort()
 };
 
 /**********************************************
-Title:countTableSize: count the table size(bytes)
+Function: countTableSize: count the table size(bytes)
 parameter: '
 tablecapacity: table max record num
 numofhashkey: num of hashkey
@@ -223,21 +223,26 @@ Error Number:
 template <class T>
 int CInmemoryTable<T>::countTableSize(int tablecapacity ,int numofhashkey,int numofsortkey)
 {
-    return (sizeof(TABLEDESCRIPTOR) + sizeof(TABLEKEY)*(numofhashkey + numofsortkey) + 2*sizeof(int)*getHashPrimeNumber(tablecapacity + 2)*numofhashkey +
-            sizeof(int)*(tablecapacity + 2)*numofsortkey + sizeof(int)*(tablecapacity + 2)*3 + (sizeof(T)*(tablecapacity + 2))/4*4+4);
+    // Memory struct is: TABLEDESCRIPTOR, keys, previous link table, next link table, data
+    return (sizeof(TABLEDESCRIPTOR) +
+            sizeof(TABLEKEY)*(numofhashkey + numofsortkey) +
+            2*sizeof(int)*getHashPrimeNumber(tablecapacity + 2)*numofhashkey +
+            sizeof(int)*(tablecapacity + 2)*numofsortkey +
+            sizeof(int)*(tablecapacity + 2)*3 +
+            (sizeof(T)*(tablecapacity + 2))/4*4+4);
 }
 
 /**********************************************
-Title:create: 
+Function: create:
 parameter:
-Description:
+Description: Create table in shared memory.
+    If the keys are need, they must be inited before insert any record into table.
+    Call addLookUpKey to init keys.
 Returns:    0 fail
 1 success
 2 already existed
 Error Number:
 *********************************************/
-
-
 template <class T>
 int CInmemoryTable<T>::create(
         CInmemoryDB *pInmemoryDB,
@@ -277,6 +282,7 @@ int CInmemoryTable<T>::create(
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::create getTablePData tableid(%d).\n",id);
         return 0;
     }
+    inmdb_log(LOGDEBUG, "Table start address in create is(%p).\n",pTable);
     // Memory struct is: TABLEDESCRIPTOR, keys, previous link table, next link table, data
 
     tableID = id;
@@ -319,7 +325,7 @@ int CInmemoryTable<T>::create(
 }
 
 /**********************************************
-Title:connect: 
+Function: connect:
 parameter:
 Description:
 Returns:    0 fail
@@ -347,6 +353,7 @@ int CInmemoryTable<T>::connect(CInmemoryDB *pInmemoryDB,int id){
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::connect getTablePData tableid(%d).\n",id);
         return 0;
     }
+    inmdb_log(LOGDEBUG, "Table start address in connect is(%p).\n",pTable);
     //get pointer to tabledescriptor begin
     pTableDescriptor = (TABLEDESCRIPTOR *)pTable;
 
@@ -383,7 +390,7 @@ int CInmemoryTable<T>::connect(CInmemoryDB *pInmemoryDB,int id){
 }
 
 /**********************************************
-Title:clear: 
+Function: clear:
 parameter:
 Description:
 Returns:    0 fail
@@ -437,14 +444,22 @@ int CInmemoryTable<T>::clear(void){
 }
 
 /**********************************************
-Title:addLookUpKey: 
+Function: addLookUpKey:
 parameter:
 Description:
 Returns: 
 Error Number:
 *********************************************/
 template <class T> 
-void CInmemoryTable<T>::addLookUpKey(int keyid,int field1offset,int field1Length, int field2offset,int field2Length,SEARCHMETHOD sm,KEYMETHOD km, const char *keyFormat){
+void CInmemoryTable<T>::addLookUpKey(
+        int keyid,
+        int field1offset,
+        int field1Length,
+        int field2offset,
+        int field2Length,
+        SEARCHMETHOD sm,
+        KEYMETHOD km,
+        const char *keyFormat){
     void *pTable = NULL;
     if(tableID < 0){
         inmdb_log(LOGCRITICAL, "tableID(%d) < 0.\n", tableID);
@@ -455,11 +470,14 @@ void CInmemoryTable<T>::addLookUpKey(int keyid,int field1offset,int field1Length
         inmdb_log(LOGCRITICAL, "pTable(%p) is NULL.\n", pTable);
         return;
     }
+    inmdb_log(LOGDEBUG, "Table start address in add lookup key is(%p).\n",pTable);
     assert(keyid>=0);
     if(sm == HASHSEARCH) {
+        inmdb_log(LOGDEBUG, "keyid(%d) numOfHashKey(%d).\n", keyid, pTableDescriptor->numOfHashKey);
         assert(keyid < pTableDescriptor->numOfHashKey);
     }
     else if(sm == SORTSEARCH) {
+        inmdb_log(LOGDEBUG, "keyid(%d) numOfSortKey(%d).\n", keyid, pTableDescriptor->numOfSortKey);
         assert(keyid < pTableDescriptor->numOfSortKey);
     }
 
@@ -480,7 +498,7 @@ void CInmemoryTable<T>::addLookUpKey(int keyid,int field1offset,int field1Length
 }
 
 /*********************************************
-Title:ASSERTTABLEINDEX: This function is NOT thread-safe!
+Function: ASSERTTABLEINDEX: This function is NOT thread-safe!
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -508,7 +526,7 @@ int CInmemoryTable<T>::ASSERTTABLEINDEX(int tableindex){
 
 
 /*********************************************
-Title:buildkey: 
+Function: buildkey:
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -558,6 +576,10 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,T& tempData,int keyid){
     else if(pKey[keyid].keyMethod == INTKEYFROMONLYINT){
         *(int *)tmpstrkey = *(int *)((intptr_t)&tempData + pKey[keyid].field1Offset);
     }
+    else if(pKey[keyid].keyMethod == STRKEYFROMONLYINT){
+        int key_v = *(int *)((intptr_t)&tempData + pKey[keyid].field1Offset);
+        sprintf((char *)tmpstrkey, pKey[keyid].keyFormat, key_v);
+    }
     else{
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable:buildkey:pKey[%d].keyMethod(%d) error.\n",keyid,pKey[keyid].keyMethod);
         return 0;
@@ -566,7 +588,7 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,T& tempData,int keyid){
 }
 
 /*********************************************
-Title:buildkey: 
+Function: buildkey:
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -578,7 +600,7 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,int dataIndex,int keyid){
 }
 
 /*********************************************
-Title:sortsearch: 
+Function: sortsearch:
 parameter:sortIndex and dataIndex is -1 when it is not founded
 Description:
 Returns: 0 error;1 success
@@ -606,7 +628,7 @@ int CInmemoryTable<T>::sortsearch(T& tempdata,int keyid, int &dataIndex, int &so
 }
 
 /*********************************************
-Title:sortsearch: 
+Function: sortsearch:
 parameter:sortIndex and dataIndex should be -1 if could not found
 Description:
 Returns: 0 error;1 success
@@ -730,7 +752,7 @@ int CInmemoryTable<T>::sortsearch(void *key,int keyid, int &dataIndex, int &sort
 }
 
 /*********************************************
-Title:sortsearch: 
+Function: sortsearch:
 parameter:sortIndex and dataIndex should be -1 if not found
 Description:
 Returns: 0 error;1 success
@@ -903,7 +925,7 @@ int CInmemoryTable<T>::sortdeletesearch(void *key,int keyid, int keyDataIndex, i
 }
 
 /*********************************************
-Title:sortsearchprefix: 
+Function: sortsearchprefix:
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -991,7 +1013,7 @@ int CInmemoryTable<T>::sortsearchprefix(void *key,int keyid, int &dataIndex, int
 }
 
 /*********************************************
-Title:search: 
+Function: search:
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1117,7 +1139,7 @@ TABLEINDEX CInmemoryTable<T>::search(T& tempdata,int keyid){
 }
 
 /*********************************************
-Title:searchNext: 
+Function: searchNext:
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1257,7 +1279,7 @@ TABLEINDEX CInmemoryTable<T>::searchNext(T& tempdata,int keyid, TABLEINDEX table
 }
 
 /*********************************************
-Title:searchPrefix: 
+Function: searchPrefix:
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1293,7 +1315,7 @@ TABLEINDEX CInmemoryTable<T>::searchPrefix(void *key,int keyid){
 }
 
 /*********************************************
-Title:searchPrefixNext
+Function: searchPrefixNext
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1343,7 +1365,7 @@ TABLEINDEX CInmemoryTable<T>::searchPrefixNext(void *key,int keyid, TABLEINDEX t
 }
 
 /*********************************************
-Title:datainsert
+Function: datainsert
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1376,7 +1398,7 @@ int CInmemoryTable<T>::datainsert(T& tempdata,int &dataIndex){
 }
 
 /*********************************************
-Title:datadelete
+Function: datadelete
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1408,7 +1430,7 @@ int CInmemoryTable<T>::datadelete(int dataIndex){
 }
 
 /*********************************************
-Title:hashinsert
+Function: hashinsert
 parameter:
 Description:
 Returns: false - error;true - success
@@ -1507,7 +1529,7 @@ bool CInmemoryTable<T>::hashinsert(int keyid, int dataIndex){
     return true;
 }
 /*********************************************
-Title:sortinsert
+Function: sortinsert
 parameter:
 Description:
 Returns: false - error;true - success
@@ -1635,7 +1657,7 @@ bool CInmemoryTable<T>::sortinsert(int keyid,int dataIndex){
 }
 
 /*********************************************
-Title:hashdelete
+Function: hashdelete
 parameter:
 Description:
 Returns: false - error;true - success
@@ -1703,7 +1725,7 @@ bool CInmemoryTable<T>::hashdelete(int keyid,int dataIndex)
 }
 
 /*********************************************
-Title:sortdelete
+Function: sortdelete
 parameter:
 Description:
 Returns: false - error;true - success
@@ -1746,7 +1768,7 @@ bool CInmemoryTable<T>::sortdelete(int keyid,int dataIndex)
 }
 
 /*********************************************
-Title:insert
+Function: insert
 parameter:
 Description:
 Returns: index in table.
@@ -1811,7 +1833,7 @@ int CInmemoryTable<T>::insert(T& tempdata){
 }
 
 /*********************************************
-Title:deletex
+Function: deletex
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1855,7 +1877,7 @@ int CInmemoryTable<T>::deletex(int dataIndex){
 }
 
 /*********************************************
-Title:getTableUseRate
+Function: getTableUseRate
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1872,11 +1894,20 @@ int CInmemoryTable<T>::GetTableLoadCount(){
 }
 
 /*********************************************
-Title:traversalPre
-parameter:
-Description:
-Returns:
-Error Number:
+Function: end
+Description: return the index for last element
+Returns: element index
+*********************************************/
+template <class T>
+int  CInmemoryTable<T>::end(){
+    return dataPre[USEDHEAD];
+}
+
+/*********************************************
+Function: traversalPre
+parameter: index for current element
+Description: return the previous index of current element
+Returns: element index
 *********************************************/
 template <class T>
 int  CInmemoryTable<T>::traversalPre(int tableindex){
@@ -1885,11 +1916,20 @@ int  CInmemoryTable<T>::traversalPre(int tableindex){
 }
 
 /*********************************************
-Title:traversalNext
-parameter:
-Description:
-Returns:
-Error Number:
+Function: begin
+Description: return the index for first element
+Returns: element index
+*********************************************/
+template <class T>
+int  CInmemoryTable<T>::begin(){
+    return dataNext[USEDHEAD];
+}
+
+/*********************************************
+Function: traversalNext
+parameter: index for current element
+Description: return the next index of current element
+Returns: element index
 *********************************************/
 template <class T>
 int  CInmemoryTable<T>::traversalNext(int tableindex){
@@ -1899,7 +1939,7 @@ int  CInmemoryTable<T>::traversalNext(int tableindex){
 
 
 /*********************************************
-Title:traversalPre
+Function: updateData
 parameter:
 Description:
 Returns: 0 error;1 success
@@ -1979,7 +2019,7 @@ int CInmemoryTable<T>::updateData(int offset,int dataLenth,int dataIndex,const v
 }
 
 /*********************************************
-Title:operator()
+Function: operator()
 parameter:
 Description:
 Returns:
@@ -1994,7 +2034,7 @@ const T* CInmemoryTable<T>::operator()(int index){
 }
 
 /*********************************************
-Title:hashfunc
+Function: hashfunc
 parameter:
 Description:
 Returns: index should >=0; -1:error
@@ -2016,7 +2056,7 @@ size_t CInmemoryTable<T>::hashfunc(const char * keyStart){
 
 
 /*********************************************
-Title:getHashPrimeNumber
+Function: getHashPrimeNumber
 parameter:
 Description:
 Returns: hashPrimeNumber
@@ -2044,7 +2084,7 @@ int CInmemoryTable<T>::getHashPrimeNumber(int hashCapacity){
 
 
 /*********************************************
-Title:dataalloc : thread-safe
+Function: dataalloc : thread-safe
 parameter:
 Description:
 Returns: 0 error;> 0 dataIndex
@@ -2082,7 +2122,7 @@ int CInmemoryTable<T>::dataalloc(){
 }
 
 /*********************************************
-Title:dataallocc: This function is NOT thread-safe!
+Function: dataallocc: This function is NOT thread-safe!
 parameter:
 Description:
 Returns: 0: error, 1: success
@@ -2117,7 +2157,7 @@ int CInmemoryTable<T>::dataallocc()
 }
 
 /*********************************************
-Title:deletexx: This function is NOT thread-safe!
+Function: deletexx: This function is NOT thread-safe!
 parameter:
 Description:
 Returns: always return 1

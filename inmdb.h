@@ -16,6 +16,7 @@
 
 class CInmemoryDB{
 private:
+    //The actually max limitation for table number is kMaxNumOfTable -1
     static const int kMaxNumOfTable = 100;
     static const int kMaxNumOfSems  = 256;
     //datamember

@@ -18,11 +18,19 @@ int main(int argc,char *argv[])
         return 1;
     }
     printf("GW table connect success. Print records in table. record count %d\n", gw.GetTableLoadCount());
-    int index = gw.traversalPre(USEDHEAD);
+    int index = gw.end();
     while(gw.ASSERTTABLEINDEX(index)) {
         const GATEWAY* r = gw(index);
         printf("Data in index %d is %d\n", index, r->port);
         index = gw.traversalPre(index);
+    }
+
+    printf("Traversal again in another order\n");
+    index = gw.begin();
+    while(gw.ASSERTTABLEINDEX(index)) {
+        const GATEWAY* r = gw(index);
+        printf("Data in index %d is %d\n", index, r->port);
+        index = gw.traversalNext(index);
     }
     return 0;
 }

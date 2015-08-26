@@ -177,16 +177,14 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
  Returns: 0 allocate table fail
           1 allocate table success
           2 already existed
-
  Error Number:
  *********************************************/
 int CInmemoryDB::createTable(int tableid,int tableSize)
 {
     assert(tableid >= 0);
-    assert(tableid < kMaxNumOfTable);
+    assert(tableid < kMaxNumOfTable-1);
     assert(tableSize > 0);
 
-    int offset;
     int *tableoffset = (int*)pShmData;
     if(tableoffset[tableid] > 0){
         return 2;
@@ -195,28 +193,29 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
     // memory struct: table offset table, shmSize, semNum, tables
     int tableOffsetStart = kMaxNumOfTable*sizeof(int) + 2*sizeof(int);
 
-    if(tableid == 0){
-        tableoffset[0] = tableOffsetStart;
-    }
-    else if(tableoffset[tableid - 1] < 0){
+    if((tableid > 0) && (tableoffset[tableid - 1] < 0)){
         // tableid must be used sequentially in create
         // From 0 to kMaxNumOfTable-1, could not jump.
+        inmdb_log(LOGDEBUG,
+                  "Table ID must be used sequentially in creation. ID %d can not be use before previous tables are created.",
+                  tableid);
         return 0;
     }
-    else{
-        tableoffset[tableid] = -1 *tableoffset[tableid];
+    else if (tableid >0){
+        tableOffsetStart = -1 *tableoffset[tableid];
     }
 
-    //set next table offset
-    offset = tableoffset[tableid] + tableSize;
-    if(offset > getDBSize()){
-        // TODO: Should do clean up here, or return earlier before set offset value.
-        inmdb_log(LOGDEBUG,"table offset(%d) beyond the db size.", offset);
+    int nextTableOffset = tableOffsetStart + tableSize;
+    if(nextTableOffset > getDBSize()){
+        inmdb_log(LOGDEBUG,"Table end address offset(%d) beyond the db size. Can not create table.", nextTableOffset);
         return 0;
     }
-    if(tableid < kMaxNumOfTable - 1){
-        tableoffset[tableid+1] = -1 * offset;
-    }
+
+    tableoffset[tableid] = tableOffsetStart;
+    tableoffset[tableid+1] = -1 * nextTableOffset;
+
+    inmdb_log(LOGDEBUG,"Set table offset (%d) to value %d.", tableid, tableOffsetStart);
+
     return 1;
 }
 
@@ -233,6 +232,7 @@ void * CInmemoryDB::getTablePData(int tableid)
     if(tableoffset[tableid] < 0){
         return (void *) NULL;
     }
+    inmdb_log(LOGDEBUG,"Get table offset (%d) with value %d.", tableid, tableoffset[tableid]);
     return (void *)((intptr_t)pShmData + tableoffset[tableid]);
 }
 
@@ -258,12 +258,13 @@ int CInmemoryDB::getDBSize(void)
  *********************************************/
 int CInmemoryDB::getTableSize(int tableid)
 {
-    if(tableid < 0||tableid >kMaxNumOfTable ){
+    int *tableoffset = (int *)pShmData;
+    if(tableid < 0 ||
+       tableid >= kMaxNumOfTable-1 ||
+       tableoffset[tableid] <0){
         inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
         return 0;
     }
-    int *tableoffset = (int *)pShmData;
-    // TODO: Should check if it is a valid(created) tableid
     return (tableoffset[tableid + 1] - tableoffset[tableid])/(1024*1024);
 }
 

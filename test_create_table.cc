@@ -16,8 +16,9 @@ int main(int argc,char *argv[])
     printf("Trying to create table in DB, max record num %d.\n", RECORD_NUM);
     printf("DB size %dMB, table size %dMB.\n",
            SHM_SIZE/(1000*1000),
-           gw.countTableSize(RECORD_NUM,0,0)/(1000*1000));
-    int createflag = gw.create(&myInmemDB,0,RECORD_NUM,2,2);
+           gw.countTableSize(RECORD_NUM,2,0)/(1000*1000));
+//    int createflag = gw.create(&myInmemDB,0,RECORD_NUM,2,2);
+    int createflag = gw.create(&myInmemDB,0,RECORD_NUM,2,0);
     if(createflag == 0){
         printf("GW table create error.\n");
         return 1;
@@ -33,6 +34,7 @@ int main(int argc,char *argv[])
         return 1;
     }
     gw.addLookUpKey(0,OFFSET(GATEWAY,tt1),64,-1,-1,HASHSEARCH,STRKEYFROMONLYSTR, "%s");
+    gw.addLookUpKey(1,OFFSET(GATEWAY,ss7gw_id),sizeof(int),-1,-1,HASHSEARCH,STRKEYFROMONLYINT, "%d");
     printf("GW table create and connect success.\n");
     return 0;
 }
