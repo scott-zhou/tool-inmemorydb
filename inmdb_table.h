@@ -287,12 +287,12 @@ int CInmemoryTable<T>::create(CInmemoryDB *pInmemoryDB, int id,int tablecapacity
     memcpy(pTable,&TDescriptor,sizeof(TABLEDESCRIPTOR));
 
     //initial the pKey[keyid].loadCount = 0;
-    pKey = (TABLEKEY*)((long)pTable + sizeof(TABLEDESCRIPTOR));
+    pKey = (TABLEKEY*)((intptr_t)pTable + sizeof(TABLEDESCRIPTOR));
     //initiate the datapre/datanext/timestamp
     //dataPre = (int*)((int)pTable + sizeof(TABLEDESCRIPTOR) + (numofhashkey + numofsortkey) * sizeof(TABLEKEY) + numofhashkey * ((tablecapacity + 2) + getHashPrimeNumber((tablecapacity + 2))) * sizeof(int) + numofsortkey * (tablecapacity + 2) * sizeof(int));
-    dataPre = (int*)((long)pTable + sizeof(TABLEDESCRIPTOR) + (numofhashkey + numofsortkey) * sizeof(TABLEKEY) + numofhashkey * (2*getHashPrimeNumber((tablecapacity + 2))) * sizeof(int) + numofsortkey * (tablecapacity + 2) * sizeof(int));
-    dataNext = (int *)((long)dataPre + (tablecapacity + 2) * sizeof(int));
-    timeStamp = (time_t *)((int)dataNext + sizeof(int) * (tablecapacity + 2));
+    dataPre = (int*)((intptr_t)pTable + sizeof(TABLEDESCRIPTOR) + (numofhashkey + numofsortkey) * sizeof(TABLEKEY) + numofhashkey * (2*getHashPrimeNumber((tablecapacity + 2))) * sizeof(int) + numofsortkey * (tablecapacity + 2) * sizeof(int));
+    dataNext = (int *)((intptr_t)dataPre + (tablecapacity + 2) * sizeof(int));
+    timeStamp = (time_t *)((intptr_t)dataNext + sizeof(int) * (tablecapacity + 2));
     dataNext[USEDHEAD] = USEDHEAD;
     dataPre[USEDHEAD] = USEDHEAD;
     dataNext[UNUSEDHEAD] = 2;
@@ -307,7 +307,7 @@ int CInmemoryTable<T>::create(CInmemoryDB *pInmemoryDB, int id,int tablecapacity
     pTable = NULL;
     tableID = id;
     pInmemDB = pInmemoryDB;
-    inmdb_log(LOGWARN, "INFO::CInmemoryTable::create tableid(%d)success.\n",id);
+    inmdb_log(LOGDEBUG, "INFO::CInmemoryTable::create tableid(%d)success.\n",id);
     return 1;
 }
 
@@ -346,32 +346,32 @@ int CInmemoryTable<T>::connect(CInmemoryDB *pInmemoryDB,int id){
     //get pointer to keyescriptor begin
     indexListSize = (pTableDescriptor->capacity + 2) * sizeof(int);
     hashListSize = (pTableDescriptor->hashPrimeNumber) * sizeof(int);
-    pKey = (TABLEKEY*)((int)pTable + sizeof(TABLEDESCRIPTOR));
+    pKey = (TABLEKEY*)((intptr_t)pTable + sizeof(TABLEDESCRIPTOR));
 
     //get pointer to each hash begin
     for(int hashNum = 0; hashNum < pTableDescriptor->numOfHashKey;hashNum ++){
-        pHash[hashNum] =(int *) ((hashNum == 0)? (int)((int)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey)):(int)((int)pHash[hashNum -1] + hashListSize));
+        pHash[hashNum] =(int *) ((hashNum == 0)? ((intptr_t)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey)):((intptr_t)pHash[hashNum -1] + hashListSize));
     }
 
     //get pointer to each hashnext begin
     for(int hashNum = 0; hashNum < pTableDescriptor->numOfHashKey;hashNum ++){
-        pHashNext[hashNum] = (int *)((hashNum == 0)?(int)((int)pHash[pTableDescriptor->numOfHashKey - 1] + hashListSize):(int)((int)pHashNext[hashNum - 1] + hashListSize));
+        pHashNext[hashNum] = (int *)((hashNum == 0)?((intptr_t)pHash[pTableDescriptor->numOfHashKey - 1] + hashListSize):((intptr_t)pHashNext[hashNum - 1] + hashListSize));
     }
 
     //get pointer to each sort begin
     for(int sortNum = 0; sortNum < pTableDescriptor->numOfSortKey;sortNum ++){
-        pSort[sortNum] = (int *)((sortNum == 0)?(int)((int)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey) + 2*hashListSize * pTableDescriptor->numOfHashKey):(int)((int)pSort[sortNum - 1] + indexListSize));
+        pSort[sortNum] = (int *)((sortNum == 0)?((intptr_t)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey) + 2*hashListSize * pTableDescriptor->numOfHashKey):((intptr_t)pSort[sortNum - 1] + indexListSize));
     }
 
     //get pointer to dataPre/dataNext/timeStamp begin
     //dataPre = (int *)((int)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey) + (hashListSize + indexListSize) * pTableDescriptor->numOfHashKey + indexListSize * pTableDescriptor->numOfSortKey);
-    dataPre = (int *)((int)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey) + (2*hashListSize) * pTableDescriptor->numOfHashKey + indexListSize * pTableDescriptor->numOfSortKey);
+    dataPre = (int *)((intptr_t)pKey + sizeof(TABLEKEY) * (pTableDescriptor->numOfSortKey + pTableDescriptor->numOfHashKey) + (2*hashListSize) * pTableDescriptor->numOfHashKey + indexListSize * pTableDescriptor->numOfSortKey);
 
-    dataNext = (int *)((int)dataPre + indexListSize);
-    timeStamp = (time_t *)((int)dataNext + indexListSize);
+    dataNext = (int *)((intptr_t)dataPre + indexListSize);
+    timeStamp = (time_t *)((intptr_t)dataNext + indexListSize);
     //get pointer to data begin
-    pData = (T *)((int)timeStamp + indexListSize);
-    inmdb_log(LOGWARN, "INFO::CInmemoryTable::connect tableid(%d)success.\n",id);
+    pData = (T *)((intptr_t)timeStamp + indexListSize);
+    inmdb_log(LOGDEBUG, "INFO::CInmemoryTable::connect tableid(%d)success.\n",id);
     return 1;
 }
 
@@ -507,8 +507,8 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,T& tempData,int keyid){
         int field2;
         memset(field1,0,sizeof(field1));
         field2 = 0;
-        strncpy(field1,(const char*)((int)&tempData + pKey[keyid].field1Offset),pKey[keyid].field1Length);
-        field2 = *(int *)((int)&tempData + pKey[keyid].field2Offset);
+        strncpy(field1,(const char*)((intptr_t)&tempData + pKey[keyid].field1Offset),pKey[keyid].field1Length);
+        field2 = *(int *)((intptr_t)&tempData + pKey[keyid].field2Offset);
         sprintf((char *)tmpstrkey,pKey[keyid].keyFormat,field1,field2);
     }
     else if(pKey[keyid].keyMethod == STRKEYFROMINTPLUSSTR){
@@ -516,8 +516,8 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,T& tempData,int keyid){
         char field2[MAXFIELDSTRING];
         memset(field2,0,sizeof(field2));
         field1 = 0;
-        field1 = *(int *)((int)&tempData + pKey[keyid].field1Offset);
-        strncpy(field2,(const char*)((int)&tempData + pKey[keyid].field2Offset),pKey[keyid].field2Length);
+        field1 = *(int *)((intptr_t)&tempData + pKey[keyid].field1Offset);
+        strncpy(field2,(const char*)((intptr_t)&tempData + pKey[keyid].field2Offset),pKey[keyid].field2Length);
         sprintf((char *)tmpstrkey,pKey[keyid].keyFormat,field1,field2);
     }
     else if(pKey[keyid].keyMethod == STRKEYFROMSTRPLUSSTR){
@@ -525,8 +525,8 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,T& tempData,int keyid){
         char field2[MAXFIELDSTRING];
         memset(field1,0,sizeof(field1));
         memset(field2,0,sizeof(field2));
-        strncpy(field1,(const char*)((int)&tempData + pKey[keyid].field1Offset),pKey[keyid].field1Length);
-        strncpy(field2,(const char*)((int)&tempData + pKey[keyid].field2Offset),pKey[keyid].field2Length);
+        strncpy(field1,(const char*)((intptr_t)&tempData + pKey[keyid].field1Offset),pKey[keyid].field1Length);
+        strncpy(field2,(const char*)((intptr_t)&tempData + pKey[keyid].field2Offset),pKey[keyid].field2Length);
         sprintf((char *)tmpstrkey,pKey[keyid].keyFormat,field1,field2);
     }
     else if(pKey[keyid].keyMethod == STRKEYFROMINTPLUSINT){
@@ -534,15 +534,15 @@ int CInmemoryTable<T>::buildkey(void *tmpstrkey,T& tempData,int keyid){
         int field2;
         field1 = 0;
         field2 = 0;
-        field1 = *(int *)((int)&tempData + pKey[keyid].field1Offset);
-        field2 = *(int *)((int)&tempData + pKey[keyid].field2Offset);
+        field1 = *(int *)((intptr_t)&tempData + pKey[keyid].field1Offset);
+        field2 = *(int *)((intptr_t)&tempData + pKey[keyid].field2Offset);
         sprintf((char *)tmpstrkey,pKey[keyid].keyFormat,field1,field2);
     }
     else if(pKey[keyid].keyMethod == STRKEYFROMONLYSTR){
-        sprintf((char *)tmpstrkey,pKey[keyid].keyFormat,(const char*)((int)&tempData + pKey[keyid].field1Offset));
+        sprintf((char *)tmpstrkey,pKey[keyid].keyFormat,(const char*)((intptr_t)&tempData + pKey[keyid].field1Offset));
     }
     else if(pKey[keyid].keyMethod == INTKEYFROMONLYINT){
-        *(int *)tmpstrkey = *(int *)((int)&tempData + pKey[keyid].field1Offset);
+        *(int *)tmpstrkey = *(int *)((intptr_t)&tempData + pKey[keyid].field1Offset);
     }
     else{
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable:buildkey:pKey[%d].keyMethod(%d) error.\n",keyid,pKey[keyid].keyMethod);
@@ -1917,7 +1917,7 @@ int CInmemoryTable<T>::updateData(int offset,int dataLenth,int dataIndex,const v
         }
     }
 
-    memcpy((void *)((int)&pData[dataIndex] + offset),pNewData,dataLenth);
+    memcpy((void *)((intptr_t)&pData[dataIndex] + offset),pNewData,dataLenth);
 
     for(int keyid = 0;keyid < pTableDescriptor->numOfHashKey;keyid ++){
         //inmdb_log(LOGCRITICAL, "pKey[%d].field1Offset = %d,pKey[keyid].field2Offset = %d\n",keyid,pKey[keyid].field1Offset,pKey[keyid].field2Offset);

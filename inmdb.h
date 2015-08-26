@@ -35,7 +35,7 @@ public:
     int unLock(int tableid);
     int releaseInmemDB(void);
     int isExist(void);
-    inline int getShmId() { return shmID; };
+    inline int getShmId() { return shmID; }
     int detatchShm(void);
 private:
     int releaseShm();
