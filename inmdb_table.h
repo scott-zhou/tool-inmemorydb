@@ -1456,7 +1456,7 @@ bool CInmemoryTable<T>::hashinsert(int keyid, int dataIndex){
         return false;
     }
     hashIndex = hashfunc(tmpStrKey);
-    inmdb_log(LOGDEBUG, "tmpStrKey='%s' hashIndex = %d dataIndex = %d\n",tmpStrKey,hashIndex,dataIndex);
+    inmdb_log(LOGDEBUG, "tmpStrKey='%s' hashIndex = %d dataIndex = %d",tmpStrKey,hashIndex,dataIndex);
     if (pHash[keyid][hashIndex] == 0){
         pHash[keyid][hashIndex] = dataIndex;
         pHashNext[keyid][hashIndex] = -1;
@@ -1465,11 +1465,11 @@ bool CInmemoryTable<T>::hashinsert(int keyid, int dataIndex){
         int oldDataIndex = pHash[keyid][hashIndex];
         memset(tmpStrKey,0,sizeof(tmpStrKey));
         if(!buildkey(tmpStrKey,oldDataIndex,keyid)){
-            inmdb_log(LOGCRITICAL, ":hashinsert.tmpstrkey(%s)dataIndex(%d) keyid(%d)buildkey return 0.\n",tmpStrKey,dataIndex,keyid);
+            inmdb_log(LOGCRITICAL, ":hashinsert.tmpstrkey(%s)dataIndex(%d) keyid(%d)buildkey return 0.",tmpStrKey,dataIndex,keyid);
             return false;
         }
         int oldhashindexhead = hashfunc(tmpStrKey);
-        inmdb_log(LOGDEBUG, "oldtmpStrKey='%s' oldhashindexhead = %d oldDataIndex=%d hashIndex=%d\n",tmpStrKey,oldhashindexhead,oldDataIndex,hashIndex);
+        inmdb_log(LOGDEBUG, "oldtmpStrKey='%s' oldhashindexhead = %d oldDataIndex=%d hashIndex=%d",tmpStrKey,oldhashindexhead,oldDataIndex,hashIndex);
         if(oldhashindexhead != hashIndex){
             int preoldhashindex = -1;
             int oldhashindex = oldhashindexhead;
@@ -1479,7 +1479,7 @@ bool CInmemoryTable<T>::hashinsert(int keyid, int dataIndex){
             }
 
             if(!oldhashindex){
-                inmdb_log(LOGDEBUG, "get the hashIndex(%d) tmpstrkey(%s)dataIndex(%d) keyid(%d) error .\n",hashIndex,tmpStrKey,dataIndex,keyid);
+                inmdb_log(LOGDEBUG, "get the hashIndex(%d) tmpstrkey(%s)dataIndex(%d) keyid(%d) error .",hashIndex,tmpStrKey,dataIndex,keyid);
                 return false;
             }
 
@@ -1777,13 +1777,9 @@ Error Number:
 template <class T>
 //TABLEINDEX CInmemoryTable<T>::insert(T& tempdata){
 int CInmemoryTable<T>::insert(T& tempdata){
-    inmdb_log(LOGDEBUG, "Start insert data to talbe %p", this);
-
     int dataIndex;
-
     //insert data
     pInmemDB->lock(tableID);
-    inmdb_log(LOGDEBUG, "After lock %p", this);
     if(!datainsert(tempdata,dataIndex)){
         dataIndex = 0;
         pInmemDB->unLock(tableID);
@@ -1792,7 +1788,6 @@ int CInmemoryTable<T>::insert(T& tempdata){
     if(!dataIndex){
         return dataIndex;
     }
-    inmdb_log(LOGDEBUG, "After datainsert %p", this);
     //insert hash data
     for(int keyid = 0;keyid < pTableDescriptor->numOfHashKey;keyid ++){
         if(!hashinsert(keyid, dataIndex)){
@@ -1809,7 +1804,6 @@ int CInmemoryTable<T>::insert(T& tempdata){
             return dataIndex;
         }
     }
-    inmdb_log(LOGDEBUG, "After insert hash key %p", this);
 
     //insert sort data
     for(int keyid = pTableDescriptor->numOfHashKey;keyid < (pTableDescriptor->numOfHashKey + pTableDescriptor->numOfSortKey);keyid ++){
@@ -1833,10 +1827,8 @@ int CInmemoryTable<T>::insert(T& tempdata){
             return dataIndex;
         }
     }
-    inmdb_log(LOGDEBUG, "After insert sort key %p", this);
 
     pInmemDB->unLock(tableID);
-    inmdb_log(LOGDEBUG, "After unlock %p", this);
     return dataIndex;
 }
 

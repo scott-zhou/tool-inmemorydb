@@ -24,6 +24,7 @@ int main(int argc,char *argv[])
         printf("connect error.\n");
         return 1;
     }
+    myInmemDB.threadSafe(false);
     printf("Create and connect success.\n");
     return 0;
 }

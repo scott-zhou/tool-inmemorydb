@@ -8,7 +8,8 @@
 CInmemoryDB::CInmemoryDB() :
         pShmData(NULL),
         semID(-1),
-        shmID(-1)
+        shmID(-1),
+        threadSafeFlag(true)
 {
 }
 
@@ -32,21 +33,15 @@ CInmemoryDB::~CInmemoryDB()
  *********************************************/
 int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int semNum, int operatorFlag)
 {
-    //ipcid is limited between 1 and 255,and ipcPathName is not empty;
-    if(ipcid < 1 || ipcid > 255){
-        inmdb_log(LOGDEBUG,"ipcid (%d) out of range.",ipcid);
-        return 0;
-    }
-    if(ipcPathName == NULL || ipcPathName[0] == 0){
-        inmdb_log(LOGDEBUG,"ipcPathName(%p) is NULL or blank.", ipcPathName);
-        return 0;
-    }
+    assert(ipcid >=0);
+    assert(ipcid <= 255);
+    assert(ipcPathName != NULL);
+    assert(strlen(ipcPathName) > 0);
+    assert(shmSize > 0);
+    assert(semNum >= 0);
+    assert(semNum <= kMaxNumOfSems);
 
-    //shmSize and semNum ard limited
-    if(shmSize <= 0 || semNum < 1 || semNum > kMaxNumOfSems){
-        inmdb_log(LOGDEBUG,"shmSize(%d)or semNum(%d) error < 1.",shmSize,semNum);
-        return 0;
-    }
+    threadSafeFlag = (semNum>0);
 
     key_t ipckey = ftok(ipcPathName,ipcid);
     if(ipckey == -1){
@@ -72,39 +67,44 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
         releaseShm();
         return 0;
     }
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d at create.", semctl(semID, 0, GETVAL));
-
 
     union semum {
         int val;
         struct semid_ds *buf;
-        ushort array[kMaxNumOfSems+1];
+        ushort *array;
     }arg;
-
+    ushort ar[kMaxNumOfSems];
     memset(&arg,0,sizeof(arg));
-    arg.val = 1;
+    memset(ar, 0, kMaxNumOfSems*sizeof(ushort));
+    for (int i=0; i<semNum; i++) {ar[i] = 1;};
+    arg.array = ar;
+
     for (int i=0; i<semNum; i++) {
-        if (semctl(semID, i, SETVAL, arg) == -1) {
-            inmdb_log(LOGDEBUG,"semctl at set value error: %d", errno);
-            releaseShm();
-            releaseSem();
-            return 0;
-        }
-        unLock(i);
+        inmdb_log(LOGDEBUG,"semval for table %d is %d before init.",i, semctl(semID, i, GETVAL));
     }
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d after set.", semctl(semID, 0, GETVAL));
+
+    if (semctl(semID, 0, SETALL, arg) == -1) {
+        inmdb_log(LOGDEBUG,"semctl SETALL fail, errno: %d", errno);
+        releaseShm();
+        releaseSem();
+        return 0;
+    }
+
+    for (int i=0; i<semNum; i++) {
+        inmdb_log(LOGDEBUG,"semval for table %d is %d after init.",i, semctl(semID, i, GETVAL));
+    }
 
     pShmData = shmat(shmID,NULL,0);
 
     if((intptr_t)pShmData == -1){
-        inmdb_log(LOGDEBUG,"shmat error: %d.", errno);
+        inmdb_log(LOGDEBUG,"shmat fail, errno: %d.", errno);
         releaseShm();
         releaseSem();
         return 0;
     }
 
     memset(pShmData, 0, shmSize);
-    for(int offsetindex = 0; offsetindex < kMaxNumOfTable; offsetindex++){
+    for(int offsetindex = 0; offsetindex < kOffsetTableSize; offsetindex++){
         // Default tableoffset value is -1, means not assigned
         int flag = -1;
         memcpy((void *)(area_0() + sizeof(int)*offsetindex),
@@ -116,6 +116,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     memcpy((void*)area_1(), &shmSize, length1());
     //memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable + sizeof(int)),&semNum,sizeof(int));
     memcpy((void*)area_2(), &semNum, length2());
+    memcpy((void*)area_3(), &threadSafeFlag, length3());
 
     //detach, a connect must be called obviously for use shared memory.
     shmdt(pShmData);
@@ -133,14 +134,10 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
  *********************************************/
 int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
 {
-    if(ipcid < 1 || ipcid > 255){
-        inmdb_log(LOGDEBUG,"ipcid(%d) is wrong.",ipcid);
-        return 0;
-    }
-    if(ipcPathName == NULL || ipcPathName[0] == 0){
-        inmdb_log(LOGDEBUG,"ipcPathName(%p) is NULL or blank.", ipcPathName);
-        return 0;
-    }
+    assert(ipcid >=0);
+    assert(ipcid <= 255);
+    assert(ipcPathName != NULL);
+    assert(strlen(ipcPathName) > 0);
 
     key_t ipckey = ftok(ipcPathName,ipcid);
     if(ipckey == -1){
@@ -173,6 +170,7 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
         shmID = -1;
         return 0;
     }
+    threadSafeFlag = *(bool*)area_3();
     inmdb_log(LOGDEBUG,"Succeed, ipcPathName=%s ipcid=%d shmID=%d semID=%d",ipcPathName,ipcid,shmID,semID);
     return 1;
 }
@@ -189,7 +187,7 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
 int CInmemoryDB::createTable(int tableid,int tableSize)
 {
     assert(tableid >= 0);
-    assert(tableid < kMaxNumOfTable-1);
+    assert(tableid < kMaxNumOfTable);
     assert(tableSize > 0);
 
     int *tableoffset = (int*)pShmData;
@@ -197,15 +195,13 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
         return 2;
     }
 
-    // memory struct: table offset table, shmSize, semNum, tables
-    //int tableOffsetStart = kMaxNumOfTable*sizeof(int) + 2*sizeof(int);
-    int tableOffsetStart = offset3();
+    int tableOffsetStart = offset4();
 
     if((tableid > 0) && (tableoffset[tableid - 1] < 0)){
         // tableid must be used sequentially in create
         // From 0 to kMaxNumOfTable-1, could not jump.
         inmdb_log(LOGDEBUG,
-                  "Table ID must be used sequentially in creation. ID %d can not be use before previous tables are created.",
+                  "Table ID must be used sequentially in create phase. ID %d can not be use before previous tables are created.",
                   tableid);
         return 0;
     }
@@ -221,9 +217,6 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
 
     tableoffset[tableid] = tableOffsetStart;
     tableoffset[tableid+1] = -1 * nextTableOffset;
-
-    inmdb_log(LOGDEBUG,"Set table offset (%d) to value %d.", tableid, tableOffsetStart);
-
     return 1;
 }
 
@@ -240,73 +233,60 @@ void * CInmemoryDB::getTablePData(int tableid)
     if(tableoffset[tableid] < 0){
         return (void *) NULL;
     }
-    inmdb_log(LOGDEBUG,"Get table offset (%d) with value %d.", tableid, tableoffset[tableid]);
     return (void *)((intptr_t)pShmData + tableoffset[tableid]);
 }
 
 /**********************************************
- Function: getDBSize:get dbshm size
- Description:
- parameter:
- Returns:
- Error Number:
- *********************************************/
-int CInmemoryDB::getDBSize(void)
-{
-    int *dbsize =(int *)((intptr_t) pShmData + sizeof(int)*kMaxNumOfTable);
-    return *dbsize;
-}
-
-/**********************************************
- Function: getTableSize:get table size
- Description:
- parameter:
- Returns:
- Error Number:
+ Function: getTableSize
+ Description: Return the size for specified table in MB
  *********************************************/
 int CInmemoryDB::getTableSize(int tableid)
 {
     int *tableoffset = (int *)pShmData;
     if(tableid < 0 ||
-       tableid >= kMaxNumOfTable-1 ||
+       tableid >= kMaxNumOfTable ||
        tableoffset[tableid] <0){
         inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
         return 0;
     }
-    return (tableoffset[tableid + 1] - tableoffset[tableid])/(1024*1024);
+    return (tableoffset[tableid + 1] - tableoffset[tableid])/(1000*1000);
+}
+
+void CInmemoryDB::threadSafe(bool v)
+{
+    if((void*)startPoint() == NULL) return;
+    threadSafeFlag = v;
+    memcpy((void*)area_3(), &threadSafeFlag, length3());
 }
 
 /**********************************************
- Function: lock:lock
+ Function: lock
  Description:
  parameter:
  Returns:N/A
  Error Number:
  *********************************************/
- int CInmemoryDB::lock(int tableid)
+ bool CInmemoryDB::lock(int tableid)
 {
-    if(tableid < 0||tableid >= kMaxNumOfTable-1 ){
-        inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
-        return 0;
-    }
+    if(!threadSafeFlag) return true;
+    assert(tableid>=0);
+    assert(tableid<kMaxNumOfTable);
     if ( semID < 0 ){
         inmdb_log(LOGDEBUG,"semID(%d) invalid",semID);
-        return 0;
+        return false;
     }
     struct sembuf sbuf;
     sbuf.sem_num= tableid;
     sbuf.sem_op = -1;
     sbuf.sem_flg = SEM_UNDO;
-    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to -1",semID, tableid);
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d before lock.", semctl(semID, 0, GETVAL));
+    inmdb_log(LOGDEBUG,"semval for table %d is %d before lock.",tableid, semctl(semID, tableid, GETVAL));
     if(semop(semID, &sbuf, 1) == -1 ){
         inmdb_log(LOGDEBUG,"semop operate error: %d, tableid = %d semID = %d",
                   errno, tableid, semID);
-        return 0;
+        return false;
     }
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d after lock.", semctl(semID, 0, GETVAL));
-    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to -1 succeed.",semID, tableid);
-    return 1;
+    inmdb_log(LOGDEBUG,"semval for table %d is %d after lock.",tableid, semctl(semID, tableid, GETVAL));
+    return true;
 }
 
 /**********************************************
@@ -316,34 +296,31 @@ int CInmemoryDB::getTableSize(int tableid)
  Returns:0 error 1success
  Error Number:
  *********************************************/
-int CInmemoryDB::unLock(int tableid)
+bool CInmemoryDB::unLock(int tableid)
 {
-    if(tableid < 0||tableid >= kMaxNumOfTable-1 ){
-        inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
-        return 0;
-    }
+    if(!threadSafeFlag) return true;
+    assert(tableid>=0);
+    assert(tableid<kMaxNumOfTable);
     if ( semID < 0 ){
         inmdb_log(LOGDEBUG,"semID(%d) invalid.",semID);
-        return 0;
+        return false;
     }
 
     struct sembuf sbuf;
     sbuf.sem_num = tableid;
     sbuf.sem_op = 1;
     sbuf.sem_flg = SEM_UNDO;
-    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to +1",semID, tableid);
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d before unlock.", semctl(semID, 0, GETVAL));
+    inmdb_log(LOGDEBUG,"semval for table %d is %d before unlock.",tableid, semctl(semID, tableid, GETVAL));
     if(semop(semID, &sbuf, 1) == -1 )
     {
         if ( errno != EINTR ){
             inmdb_log(LOGDEBUG,"semop error: %d, tableid = %d semID = %d",
                       errno, tableid, semID);
-            return 0;
+            return false;
         }
     }
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d after unlock.", semctl(semID, 0, GETVAL));
-    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to +1 succeed.",semID, tableid);
-    return 1;
+    inmdb_log(LOGDEBUG,"semval for table %d is %d after unlock.",tableid, semctl(semID, tableid, GETVAL));
+    return true;
 }
 
 /**********************************************
