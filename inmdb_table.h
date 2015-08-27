@@ -1777,10 +1777,13 @@ Error Number:
 template <class T>
 //TABLEINDEX CInmemoryTable<T>::insert(T& tempdata){
 int CInmemoryTable<T>::insert(T& tempdata){
+    inmdb_log(LOGDEBUG, "Start insert data to talbe %p", this);
+
     int dataIndex;
 
     //insert data
     pInmemDB->lock(tableID);
+    inmdb_log(LOGDEBUG, "After lock %p", this);
     if(!datainsert(tempdata,dataIndex)){
         dataIndex = 0;
         pInmemDB->unLock(tableID);
@@ -1789,6 +1792,7 @@ int CInmemoryTable<T>::insert(T& tempdata){
     if(!dataIndex){
         return dataIndex;
     }
+    inmdb_log(LOGDEBUG, "After datainsert %p", this);
     //insert hash data
     for(int keyid = 0;keyid < pTableDescriptor->numOfHashKey;keyid ++){
         if(!hashinsert(keyid, dataIndex)){
@@ -1805,6 +1809,7 @@ int CInmemoryTable<T>::insert(T& tempdata){
             return dataIndex;
         }
     }
+    inmdb_log(LOGDEBUG, "After insert hash key %p", this);
 
     //insert sort data
     for(int keyid = pTableDescriptor->numOfHashKey;keyid < (pTableDescriptor->numOfHashKey + pTableDescriptor->numOfSortKey);keyid ++){
@@ -1828,7 +1833,10 @@ int CInmemoryTable<T>::insert(T& tempdata){
             return dataIndex;
         }
     }
+    inmdb_log(LOGDEBUG, "After insert sort key %p", this);
+
     pInmemDB->unLock(tableID);
+    inmdb_log(LOGDEBUG, "After unlock %p", this);
     return dataIndex;
 }
 

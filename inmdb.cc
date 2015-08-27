@@ -21,7 +21,7 @@ CInmemoryDB::~CInmemoryDB()
 }
 
 /**********************************************
- Title:create:ipc create
+ Function: create:ipc create
  parameter:
  Description:
  Returns:0 fail
@@ -72,6 +72,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
         releaseShm();
         return 0;
     }
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d at create.", semctl(semID, 0, GETVAL));
 
 
     union semum {
@@ -87,8 +88,11 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
             inmdb_log(LOGDEBUG,"semctl at set value error: %d", errno);
             releaseShm();
             releaseSem();
+            return 0;
         }
+        unLock(i);
     }
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d after set.", semctl(semID, 0, GETVAL));
 
     pShmData = shmat(shmID,NULL,0);
 
@@ -103,13 +107,15 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     for(int offsetindex = 0; offsetindex < kMaxNumOfTable; offsetindex++){
         // Default tableoffset value is -1, means not assigned
         int flag = -1;
-        memcpy((void *)((intptr_t)pShmData + sizeof(int)*offsetindex),
+        memcpy((void *)(area_0() + sizeof(int)*offsetindex),
                &flag,
                sizeof(int));
     }
 
-    memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable),&shmSize,sizeof(int));
-    memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable + sizeof(int)),&semNum,sizeof(int));
+    //memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable),&shmSize,sizeof(int));
+    memcpy((void*)area_1(), &shmSize, length1());
+    //memcpy((void *)((intptr_t)pShmData + sizeof(int)*kMaxNumOfTable + sizeof(int)),&semNum,sizeof(int));
+    memcpy((void*)area_2(), &semNum, length2());
 
     //detach, a connect must be called obviously for use shared memory.
     shmdt(pShmData);
@@ -118,7 +124,7 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
 }
 
 /**********************************************
- Title:connect:ipc connect
+ Function: connect:ipc connect
  Description:
  parameter:
  Returns:0 fail
@@ -142,7 +148,7 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
         return 0;
     }
 
-    shmID = shmget(ipckey,0,IPC_CREAT);
+    shmID = shmget(ipckey,0,IPC_CREAT|accessFlag);
     if(shmID == -1){
         //The shared memory is not existed
         inmdb_log(LOGDEBUG,"shmget error: %d, ipcPathName=%s ipcid=%d ipckey = %d",
@@ -150,13 +156,14 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
         return 0;
     }
 
-    semID = semget(ipckey,0 ,IPC_CREAT);
+    semID = semget(ipckey,0 ,IPC_CREAT|accessFlag);
     if(semID == -1){
         inmdb_log(LOGDEBUG,"semget error: %d, ipcPathName=%s ipcid=%d ipckey = %d",
                   errno, ipcPathName, ipcid, ipckey);
         shmID = -1;
         return 0;
     }
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d when connect.", semctl(semID, 0, GETVAL));
     pShmData = shmat(shmID,NULL,0);
 
     if((intptr_t)pShmData == -1){
@@ -166,12 +173,12 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
         shmID = -1;
         return 0;
     }
-    inmdb_log(LOGDEBUG,"Succeed, ipcPathName=%s ipcid=%d shmID = %d",ipcPathName,ipcid,shmID);
+    inmdb_log(LOGDEBUG,"Succeed, ipcPathName=%s ipcid=%d shmID=%d semID=%d",ipcPathName,ipcid,shmID,semID);
     return 1;
 }
 
 /**********************************************
- Title:createTable:allocate ipc resource for table
+ Function: createTable:allocate ipc resource for table
  Description:
  parameter:
  Returns: 0 allocate table fail
@@ -191,7 +198,8 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
     }
 
     // memory struct: table offset table, shmSize, semNum, tables
-    int tableOffsetStart = kMaxNumOfTable*sizeof(int) + 2*sizeof(int);
+    //int tableOffsetStart = kMaxNumOfTable*sizeof(int) + 2*sizeof(int);
+    int tableOffsetStart = offset3();
 
     if((tableid > 0) && (tableoffset[tableid - 1] < 0)){
         // tableid must be used sequentially in create
@@ -220,7 +228,7 @@ int CInmemoryDB::createTable(int tableid,int tableSize)
 }
 
 /**********************************************
- Title:getTablePData:allocate ipc resource for table
+ Function: getTablePData:allocate ipc resource for table
  Description:
  parameter:
  Returns: NULL:error
@@ -237,7 +245,7 @@ void * CInmemoryDB::getTablePData(int tableid)
 }
 
 /**********************************************
- Title:getDBSize:get dbshm size
+ Function: getDBSize:get dbshm size
  Description:
  parameter:
  Returns:
@@ -250,7 +258,7 @@ int CInmemoryDB::getDBSize(void)
 }
 
 /**********************************************
- Title:getTableSize:get table size
+ Function: getTableSize:get table size
  Description:
  parameter:
  Returns:
@@ -269,7 +277,7 @@ int CInmemoryDB::getTableSize(int tableid)
 }
 
 /**********************************************
- Title:lock:lock
+ Function: lock:lock
  Description:
  parameter:
  Returns:N/A
@@ -277,7 +285,7 @@ int CInmemoryDB::getTableSize(int tableid)
  *********************************************/
  int CInmemoryDB::lock(int tableid)
 {
-    if(tableid < 0||tableid >kMaxNumOfTable ){
+    if(tableid < 0||tableid >= kMaxNumOfTable-1 ){
         inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
         return 0;
     }
@@ -289,16 +297,20 @@ int CInmemoryDB::getTableSize(int tableid)
     sbuf.sem_num= tableid;
     sbuf.sem_op = -1;
     sbuf.sem_flg = SEM_UNDO;
+    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to -1",semID, tableid);
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d before lock.", semctl(semID, 0, GETVAL));
     if(semop(semID, &sbuf, 1) == -1 ){
         inmdb_log(LOGDEBUG,"semop operate error: %d, tableid = %d semID = %d",
                   errno, tableid, semID);
         return 0;
     }
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d after lock.", semctl(semID, 0, GETVAL));
+    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to -1 succeed.",semID, tableid);
     return 1;
 }
 
 /**********************************************
- Title:unLock:unLock
+ Function: unLock:unLock
  Description:
  parameter:
  Returns:0 error 1success
@@ -306,6 +318,10 @@ int CInmemoryDB::getTableSize(int tableid)
  *********************************************/
 int CInmemoryDB::unLock(int tableid)
 {
+    if(tableid < 0||tableid >= kMaxNumOfTable-1 ){
+        inmdb_log(LOGDEBUG,"tableid(%d) invalid",tableid);
+        return 0;
+    }
     if ( semID < 0 ){
         inmdb_log(LOGDEBUG,"semID(%d) invalid.",semID);
         return 0;
@@ -315,6 +331,8 @@ int CInmemoryDB::unLock(int tableid)
     sbuf.sem_num = tableid;
     sbuf.sem_op = 1;
     sbuf.sem_flg = SEM_UNDO;
+    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to +1",semID, tableid);
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d before unlock.", semctl(semID, 0, GETVAL));
     if(semop(semID, &sbuf, 1) == -1 )
     {
         if ( errno != EINTR ){
@@ -323,11 +341,13 @@ int CInmemoryDB::unLock(int tableid)
             return 0;
         }
     }
+    inmdb_log(LOGDEBUG,"semval for table 0 is %d after unlock.", semctl(semID, 0, GETVAL));
+    inmdb_log(LOGDEBUG,"Operater on semaphore %d num %d to +1 succeed.",semID, tableid);
     return 1;
 }
 
 /**********************************************
- Title:unLock:releaseInmemDB
+ Function: unLock:releaseInmemDB
  Description:
  parameter:
  Returns:0 error 1success
@@ -342,33 +362,22 @@ int CInmemoryDB::releaseInmemDB(void)
 }
 
 /**********************************************
- Title:unLock:isExist
- Description:
- parameter:
- Returns:0 error 1success
- Error Number:
+ Function: exist
+ Description: return if the shared memory is created or not
  *********************************************/
- int CInmemoryDB::isExist(void)
+ bool CInmemoryDB::exist(void)
 {
     struct shmid_ds ds;
     memset(&ds, 0, sizeof(struct shmid_ds));
-    if ( shmID >= 0 ){
-        if ( shmctl (shmID, IPC_STAT, &ds) < 0 ) {
-            return 0;
-        }
-        else{
-            return 1;
-        }
+    if ( shmID >= 0 && shmctl (shmID, IPC_STAT, &ds) >= 0){
+        return true;
     }
-    else{
-        inmdb_log(LOGDEBUG,"shmID(%d) invalid", shmID);
-        return 0;
-    }
-    return 1;
+    inmdb_log(LOGDEBUG,"shmID(%d) invalid", shmID);
+    return false;
 }
 
 /**********************************************
- Title:releaseShm:releaseShm
+ Function: releaseShm:releaseShm
  Description:
  parameter:
  Returns:0 error 1success
@@ -394,7 +403,7 @@ int CInmemoryDB::releaseShm(void)
 }
 
 /**********************************************
- Title:releaseSem:releaseSem
+ Function: releaseSem:releaseSem
  Description:
  parameter:
  Returns:0 error 1success
@@ -416,4 +425,3 @@ int CInmemoryDB::detatchShm(void)
 
     return (shmdt(pShmData)==0);
 }
-
