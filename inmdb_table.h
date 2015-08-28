@@ -282,7 +282,6 @@ int CInmemoryTable<T>::create(
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::create getTablePData tableid(%d).\n",id);
         return 0;
     }
-    inmdb_log(LOGDEBUG, "Table start address in create is(%p).\n",pTable);
     // Memory struct is: TABLEDESCRIPTOR, keys, previous link table, next link table, data
 
     tableID = id;
@@ -353,7 +352,6 @@ int CInmemoryTable<T>::connect(CInmemoryDB *pInmemoryDB,int id){
         inmdb_log(LOGCRITICAL, "FATAL ERROR::CInmemoryTable::connect getTablePData tableid(%d).\n",id);
         return 0;
     }
-    inmdb_log(LOGDEBUG, "Table start address in connect is(%p).\n",pTable);
     //get pointer to tabledescriptor begin
     pTableDescriptor = (TABLEDESCRIPTOR *)pTable;
 
@@ -470,7 +468,6 @@ void CInmemoryTable<T>::addLookUpKey(
         inmdb_log(LOGCRITICAL, "pTable(%p) is NULL.\n", pTable);
         return;
     }
-    inmdb_log(LOGDEBUG, "Table start address in add lookup key is(%p).\n",pTable);
     assert(keyid>=0);
     if(sm == HASHSEARCH) {
         inmdb_log(LOGDEBUG, "keyid(%d) numOfHashKey(%d).\n", keyid, pTableDescriptor->numOfHashKey);

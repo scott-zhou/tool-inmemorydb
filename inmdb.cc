@@ -79,19 +79,11 @@ int CInmemoryDB::create(const char *ipcPathName, int ipcid, int shmSize, int sem
     for (int i=0; i<semNum; i++) {ar[i] = 1;};
     arg.array = ar;
 
-    for (int i=0; i<semNum; i++) {
-        inmdb_log(LOGDEBUG,"semval for table %d is %d before init.",i, semctl(semID, i, GETVAL));
-    }
-
     if (semctl(semID, 0, SETALL, arg) == -1) {
         inmdb_log(LOGDEBUG,"semctl SETALL fail, errno: %d", errno);
         releaseShm();
         releaseSem();
         return 0;
-    }
-
-    for (int i=0; i<semNum; i++) {
-        inmdb_log(LOGDEBUG,"semval for table %d is %d after init.",i, semctl(semID, i, GETVAL));
     }
 
     pShmData = shmat(shmID,NULL,0);
@@ -160,7 +152,6 @@ int CInmemoryDB::connect(const char *ipcPathName,int ipcid,int accessFlag)
         shmID = -1;
         return 0;
     }
-    inmdb_log(LOGDEBUG,"semval for table 0 is %d when connect.", semctl(semID, 0, GETVAL));
     pShmData = shmat(shmID,NULL,0);
 
     if((intptr_t)pShmData == -1){
@@ -279,13 +270,12 @@ void CInmemoryDB::threadSafe(bool v)
     sbuf.sem_num= tableid;
     sbuf.sem_op = -1;
     sbuf.sem_flg = SEM_UNDO;
-    inmdb_log(LOGDEBUG,"semval for table %d is %d before lock.",tableid, semctl(semID, tableid, GETVAL));
     if(semop(semID, &sbuf, 1) == -1 ){
         inmdb_log(LOGDEBUG,"semop operate error: %d, tableid = %d semID = %d",
                   errno, tableid, semID);
         return false;
     }
-    inmdb_log(LOGDEBUG,"semval for table %d is %d after lock.",tableid, semctl(semID, tableid, GETVAL));
+    inmdb_log(LOGDEBUG,"lock succeed, semval for table %d is %d after lock.",tableid, semctl(semID, tableid, GETVAL));
     return true;
 }
 
@@ -310,7 +300,6 @@ bool CInmemoryDB::unLock(int tableid)
     sbuf.sem_num = tableid;
     sbuf.sem_op = 1;
     sbuf.sem_flg = SEM_UNDO;
-    inmdb_log(LOGDEBUG,"semval for table %d is %d before unlock.",tableid, semctl(semID, tableid, GETVAL));
     if(semop(semID, &sbuf, 1) == -1 )
     {
         if ( errno != EINTR ){
@@ -319,7 +308,7 @@ bool CInmemoryDB::unLock(int tableid)
             return false;
         }
     }
-    inmdb_log(LOGDEBUG,"semval for table %d is %d after unlock.",tableid, semctl(semID, tableid, GETVAL));
+    inmdb_log(LOGDEBUG,"unlock succeed, semval for table %d is %d after unlock.",tableid, semctl(semID, tableid, GETVAL));
     return true;
 }
 
