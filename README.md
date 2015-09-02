@@ -31,4 +31,8 @@ Which is a very simple implement for log function. You have to replace it with y
 ## Other test related files:
 For test usage.
 
+## Author
 Created by [Scott Zhou](http://www.scottzhou.me)
+
+## License
+This project is licensed under the [MIT license](http://opensource.org/licenses/MIT).
